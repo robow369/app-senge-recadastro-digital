@@ -24,7 +24,7 @@ import {
   validateYear,
   validateRequired,
 } from '@/utils/validators';
-import { submitRegistrationUpdate } from '@/services/api';
+import { submitRegistrationUpdate, ExportFormat } from '@/services/api';
 
 /** Initial empty form state */
 const INITIAL_FORM: FormData = {
@@ -260,13 +260,13 @@ export function useFormState() {
    * Validates the form and, if valid, submits it via the API service.
    * Updates submitResult with the server response.
    */
-  const handleSubmit = async () => {
+  const handleSubmit = async (format: ExportFormat = 'docx') => {
     setSubmitResult(null);
     // if (!validate()) return; // testing purposes, remove this
- 
+
     setIsSubmitting(true);
     try {
-      const result = await submitRegistrationUpdate(form);
+      const result = await submitRegistrationUpdate(form, format);
       setSubmitResult(result);
       if (result.success) setForm(INITIAL_FORM);
     } catch {

@@ -5,7 +5,7 @@
  * displays a submission result banner.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   ScrollView,
@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   SafeAreaView,
+  Modal,
 } from 'react-native';
 import { useFonts } from 'expo-font';
 import {
@@ -25,10 +26,18 @@ import {
 } from '@expo-google-fonts/roboto';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
-import { CircleCheck as CheckCircle, CircleAlert as AlertCircle, Send } from 'lucide-react-native';
+import {
+  CircleCheck as CheckCircle,
+  CircleAlert as AlertCircle,
+  Send,
+  FileText,
+  FileImage,
+  X,
+} from 'lucide-react-native';
 
 import { COLORS } from '@/constants/colors';
 import { useFormState } from '@/hooks/useFormState';
+import { ExportFormat } from '@/services/api';
 import FormHeader from '@/components/FormHeader';
 import FormSection from '@/components/form/FormSection';
 import DadosPessoaisSection from '@/components/form/DadosPessoaisSection';
@@ -41,7 +50,6 @@ import DependentsSection from '@/components/form/DependentsSection';
 SplashScreen.preventAutoHideAsync();
 
 export default function FormScreen() {
-  /* ── Load Google Fonts ────────────────────────────────────────────── */
   const [fontsLoaded, fontError] = useFonts({
     'Roboto-Regular': Roboto_400Regular,
     'Roboto-Medium': Roboto_500Medium,
@@ -54,18 +62,11 @@ export default function FormScreen() {
     }
   }, [fontsLoaded, fontError]);
 
-  /* Keep splash visible while fonts load */
   if (!fontsLoaded && !fontError) return null;
 
-  /* ── Form state from custom hook ──────────────────────────────────── */
   return <FormContent />;
 }
 
-/**
- * Inner component that consumes the form state hook.
- * Separated so the font-loading guard above doesn't cause
- * hook order issues with useFormState.
- */
 function FormContent() {
   const {
     form,
@@ -89,6 +90,15 @@ function FormContent() {
     handleSubmit,
   } = useFormState();
 
+  const [formatModalVisible, setFormatModalVisible] = useState(false);
+
+  const openFormatPicker = () => setFormatModalVisible(true);
+
+  const confirmFormat = (format: ExportFormat) => {
+    setFormatModalVisible(false);
+    handleSubmit(format);
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -102,11 +112,9 @@ function FormContent() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* ── Institutional header ────────────────────────────────── */}
           <FormHeader />
 
           <View style={styles.formBody}>
-            {/* ── DADOS PESSOAIS ──────────────────────────────────── */}
             <DadosPessoaisSection
               form={form}
               errors={errors}
@@ -116,7 +124,6 @@ function FormContent() {
               setDataNascimento={setDataNascimento}
             />
 
-            {/* ── ENDEREÇO ────────────────────────────────────────── */}
             <EnderecoSection
               form={form}
               errors={errors}
@@ -126,7 +133,6 @@ function FormContent() {
               setCelular={setCelular}
             />
 
-            {/* ── DADOS PROFISSIONAIS ─────────────────────────────── */}
             <DadosProfissionaisSection
               form={form}
               errors={errors}
@@ -135,7 +141,6 @@ function FormContent() {
               setDataEmissao={setDataEmissao}
             />
 
-            {/* ── ATIVIDADES PROFISSIONAIS ─────────────────────────── */}
             <AtividadesSection
               form={form}
               errors={errors}
@@ -144,7 +149,6 @@ function FormContent() {
               setTelefoneEmpresa={setTelefoneEmpresa}
             />
 
-            {/* ── DEPENDENTES PARA UNIMED ─────────────────────────── */}
             <FormSection title="Dependentes para Unimed" />
             <DependentsSection
               dependentes={form.dependentes}
@@ -154,7 +158,6 @@ function FormContent() {
               onRemove={removeDependent}
             />
 
-            {/* ── Observations ─────────────────────────────────────── */}
             <View style={styles.observacoes}>
               <Text style={styles.obsTitle}>Observação:</Text>
               <Text style={styles.obsText}>
@@ -165,7 +168,6 @@ function FormContent() {
               </Text>
             </View>
 
-            {/* ── Submission result banner ─────────────────────────── */}
             {submitResult && (
               <View
                 style={[
@@ -182,10 +184,9 @@ function FormContent() {
               </View>
             )}
 
-            {/* ── Submit button ─────────────────────────────────────── */}
             <TouchableOpacity
               style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
-              onPress={handleSubmit}
+              onPress={openFormatPicker}
               disabled={isSubmitting}
               activeOpacity={0.8}
             >
@@ -199,11 +200,70 @@ function FormContent() {
               )}
             </TouchableOpacity>
 
-            {/* Bottom spacer */}
             <View style={{ height: 32 }} />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Format picker modal ──────────────────────────────────── */}
+      <Modal
+        visible={formatModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFormatModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setFormatModalVisible(false)}
+        >
+          <View style={styles.modalSheet}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Escolher formato do arquivo</Text>
+              <TouchableOpacity onPress={() => setFormatModalVisible(false)}>
+                <X size={20} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Selecione o formato em que deseja salvar o formulário preenchido.
+            </Text>
+
+            <View style={styles.formatOptions}>
+              {/* DOCX option */}
+              <TouchableOpacity
+                style={styles.formatCard}
+                onPress={() => confirmFormat('docx')}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.formatIconWrap, { backgroundColor: '#E8F4FD' }]}>
+                  <FileText size={28} color={COLORS.primaryDark} />
+                </View>
+                <Text style={styles.formatCardTitle}>Word (.docx)</Text>
+                <Text style={styles.formatCardDesc}>
+                  Editável no Microsoft Word ou Google Docs
+                </Text>
+              </TouchableOpacity>
+
+              {/* PDF option */}
+              <TouchableOpacity
+                style={styles.formatCard}
+                onPress={() => confirmFormat('pdf')}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.formatIconWrap, { backgroundColor: '#FEF0EC' }]}>
+                  <FileImage size={28} color="#C0392B" />
+                </View>
+                <Text style={styles.formatCardTitle}>PDF (.pdf)</Text>
+                <Text style={styles.formatCardDesc}>
+                  Ideal para impressão e assinatura digital
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -287,5 +347,75 @@ const styles = StyleSheet.create({
     fontSize: 14,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  /* Modal */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingBottom: Platform.OS === 'android' ? 24 : 36,
+    paddingTop: 4,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 15,
+    fontFamily: 'Roboto-Bold',
+    color: COLORS.text,
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Roboto-Regular',
+    color: COLORS.textSecondary,
+    marginBottom: 20,
+    lineHeight: 18,
+  },
+  formatOptions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  formatCard: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: COLORS.white,
+  },
+  formatIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  formatCardTitle: {
+    fontSize: 13,
+    fontFamily: 'Roboto-Bold',
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  formatCardDesc: {
+    fontSize: 11,
+    fontFamily: 'Roboto-Regular',
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });

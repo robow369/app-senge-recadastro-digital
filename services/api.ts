@@ -6,10 +6,14 @@
 
 import { FormData } from '@/types/form';
 import { generateAndDownloadDocx } from './docGenerator';
+import { generateAndDownloadPdf } from './pdfGenerator';
 import { Alert } from 'react-native';
 
 /** Simulated network latency in milliseconds */
 const MOCK_DELAY_MS = 1500;
+
+/** Supported export formats */
+export type ExportFormat = 'docx' | 'pdf';
 
 /** Response shape returned by the update endpoint */
 export interface ApiResponse {
@@ -23,9 +27,13 @@ export interface ApiResponse {
  * Currently mocked: waits MOCK_DELAY_MS then returns a success response.
  *
  * @param formData - Validated form data to be sent to the server
+ * @param format   - File format to generate ('docx' or 'pdf')
  * @returns Promise resolving to an ApiResponse object
  */
-export async function submitRegistrationUpdate(formData: FormData): Promise<ApiResponse> {
+export async function submitRegistrationUpdate(
+  formData: FormData,
+  format: ExportFormat = 'docx',
+): Promise<ApiResponse> {
   /* Simulate async network request */
   await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
 
@@ -44,26 +52,25 @@ export async function submitRegistrationUpdate(formData: FormData): Promise<ApiR
   /* Log payload for development inspection */
   console.log('[MOCK API] PUT /members/update', JSON.stringify(formData, null, 2));
 
-  // Convert to docx so the user can sign it at gob.br
   try {
-    await generateAndDownloadDocx(formData);
+    if (format === 'pdf') {
+      await generateAndDownloadPdf(formData);
+    } else {
+      await generateAndDownloadDocx(formData);
+    }
   } catch (error) {
-    // Alert.alert(`${error instanceof Error ? error.message : String(error)}`);
+    const fullMessage = error instanceof Error
+      ? `${error.message}\n\nStack: ${error.stack}`
+      : JSON.stringify(error, null, 2);
 
-    const fullMessage = error instanceof Error ? 
-      `${error.message}\n\nStack: ${error.stack}` : 
-      JSON.stringify(error, null, 2);
-
-    // Split into 200-character chunks to force the Alert to show them
     const chunks = fullMessage.match(/.{1,200}/g) || [];
-    
     chunks.forEach((chunk, index) => {
       Alert.alert(`Error Part ${index + 1}`, chunk);
     });
 
-    console.error('[API] Error generating DOCX document:', error);
+    console.error('[API] Error generating document:', error);
     throw new Error(
-      `Failed to generate document: ${error instanceof Error ? error.message : String(error)}`
+      `Failed to generate document: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
